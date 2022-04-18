@@ -1,42 +1,69 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+class Grid:
+    """ definition of a grid of points """
 
-def readvoxfile(path):
+    def __init__(self):
+        self.Origin = None
+        self.XAxis = None
+        self.YAxis = None
+        self.Domain = None
+        self.Count = None
+
+class ProbabilityMatrix:
+    """ a grid plus corresponding value matrix """
+
+    def __init__(self, values, grid):
+        self.Values = values
+        self.Grid = grid
+
+
+def readProbMat(path):
     """returns a [values matrix, grid info] pair"""
     print(path)
     file = open(path)
     txt = file.readlines()
     file.close()
 
+    mygrid = Grid()
     grid_info = np.fromstring(txt.pop(), sep=",")
-    count = int(grid_info[11])
-    mat = np.zeros(pow(count, 3))
+
+    mygrid.Origin = grid_info[0:3]
+    mygrid.XAxis = grid_info[3:6]
+    mygrid.YAxis = grid_info[6:9]
+    mygrid.Domain = grid_info[9:11]
+    mygrid.Count = int(grid_info[11])
+
+    step = (mygrid.Domain[1] - mygrid.Domain[0]) / mygrid.Count
+    phase = step / 2
+
+    mat = np.zeros(pow(mygrid.Count, 3))
     for i in range(len(txt)):
         vals = txt[i][:-1].split(',')
         for j in range(len(vals)):
-            mat[count * i + j] = float(vals[j])
-    mat = mat.reshape(count, count, count)
+            mat[mygrid.Count * i + j] = float(vals[j])
+    mat = mat.reshape(mygrid.Count, mygrid.Count, mygrid.Count)
 
-    return [mat, grid_info]
+    probmat = ProbabilityMatrix(mat, mygrid)
+
+    return probmat
 
 
-def dotplot(mat, grid_info, threshold):
+def dotplot(probmat, threshold):
     """Plot a dot representation of object in Camera Plane Space"""
+    mat = probmat.Values
+    grid = probmat.Grid
+
     b = mat < threshold
     mat[b] = 0
 
-    origin = grid_info[0:3]
-    xaxis = grid_info[3:6]
-    yaxis = grid_info[6:9]
-    domain = grid_info[9:11]
-    count = grid_info[11]
-    step = (domain[1] - domain[0]) / count
+    step = (grid.Domain[1] - grid.Domain[0]) / grid.Count
     phase = step / 2
 
     fig = plt.Figure(figsize=(5, 5))
     ax = plt.axes(projection='3d')
-    series = np.arange(domain[0]+phase, domain[1], step)
+    series = np.arange(grid.Domain[0]+phase, grid.Domain[1], step)
     print(series.size)
     xx, yy, zz = np.meshgrid(series, series, series)
     size = mat * 10
@@ -64,37 +91,36 @@ def constructMesh(vertices, faces, path, name):
     print("file made successfully here:\n" + path + name)
 
 
-def voxtomesh(mat, grid_info, threshold, path, name):
+def meshprobmat(probmat, threshold, path, name):
     """convert the weighted voxel matrix into a mesh"""
-    origin = grid_info[0:3]
-    xaxis = grid_info[3:6]
-    yaxis = grid_info[6:9]
-    domain = grid_info[9:11]
-    count = int(grid_info[11])
-    step = (domain[1]-domain[0])/count
+
+    mat = probmat.Values
+    grid = probmat.Grid
+
+    step = (grid.Domain[1]-grid.Domain[0])/grid.Count
     phase = step/2
 
     # print(origin, xaxis, yaxis, domain, count, step)
 
     # get indices for each voxel as 3 lists
-    series = np.arange(domain[0]+phase, domain[1], step)
+    series = np.arange(grid.Domain[0]+phase, grid.Domain[1], step)
     xx, yy, zz = np.meshgrid(series, series, series)
 
     # get vertex indices
-    indices = np.arange(pow(count+1, 3)).reshape(count+1, count+1, count+1)
+    indices = np.arange(pow(grid.Count+1, 3)).reshape(grid.Count+1, grid.Count+1, grid.Count+1)
     indices = indices + 1
 
     # get  the world space coordinates for every vertex of the grid
-    v_series = np.arange(domain[0], domain[1]+step, step)
+    v_series = np.arange(grid.Domain[0], grid.Domain[1]+step, step)
     vx, vy, vz = np.meshgrid(v_series, v_series, v_series)
     vertices = np.stack((vx, vy, vz), axis=3)
-    vertices = vertices.reshape(pow(count+1, 3), 3)
+    vertices = vertices.reshape(pow(grid.Count+1, 3), 3)
 
     # get boolean matrix by threshold
     mat_bool = mat > threshold
 
     # find left and right boundaries
-    false_grid = np.full((1, count, count), False, dtype=bool)
+    false_grid = np.full((1, grid.Count, grid.Count), False, dtype=bool)
     mat_left = np.concatenate((false_grid, mat_bool), 0)
     mat_right = np.concatenate((mat_bool, false_grid), 0)
     left_bool = np.logical_and(np.logical_not(mat_left), mat_right)
@@ -117,7 +143,7 @@ def voxtomesh(mat, grid_info, threshold, path, name):
     right_faces = np.column_stack((right_faces_0, right_faces_1, right_faces_2, right_faces_3))
 
     # find front and back boundaries
-    false_grid = np.full((count, 1, count), False, dtype=bool)
+    false_grid = np.full((grid.Count, 1, grid.Count), False, dtype=bool)
     mat_front = np.concatenate((false_grid, mat_bool), 1)
     mat_back = np.concatenate((mat_bool, false_grid), 1)
     front_bool = np.logical_and(np.logical_not(mat_front), mat_back)
@@ -138,7 +164,7 @@ def voxtomesh(mat, grid_info, threshold, path, name):
     back_faces = np.column_stack((back_faces_3, back_faces_2, back_faces_1, back_faces_0))
 
     # find vertical boundaries by overlapping shifted matrices
-    false_grid = np.full((count, count, 1), False, dtype=bool)
+    false_grid = np.full((grid.Count, grid.Count, 1), False, dtype=bool)
     mat_bot = np.concatenate((false_grid, mat_bool), 2)
     mat_top = np.concatenate((mat_bool,  false_grid), 2)
     bot_bool = np.logical_and(mat_top, np.logical_not(mat_bot))
