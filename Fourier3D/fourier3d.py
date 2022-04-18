@@ -107,4 +107,55 @@ def generate_compressed(file_path, output_directory="data", output_prefix="model
     return str(output_directory) + "/" + str(output_prefix) + "_" + str(freq_floor) + ".txt"
 
 
-quit()
+def single_freq_eval(size, i, j, k, x, y, z, amp_real, amp_complex):
+    """
+    :returns: the result of the 3d-frequency <i,j,k> evaluated at <x,y,z>.
+    """
+    tpi = 2 * np.pi
+    val = (-1) * amp_complex * np.sin(tpi * (i * x + j * y + k * z) / size) + amp_real * np.cos(
+        tpi * (i * x + j * y + k * z) / size)
+    return val * (1 / (size ** 3))
+    # Adjustments: shrunk by size^-3, amp_complex applies to sin, amp_real applies to cos, (-1) amp_complex
+
+
+def evaluate_at(np_3d_array_frequencies, x, y, z):
+    """
+    :return: The fourier series evaluated at the point (x,y,z)
+    """
+    sz = len(np_3d_array_frequencies)
+    val = 0
+    for i in range(0, sz):
+        for j in range(0, sz):
+            for k in range(0, sz):
+                amp_real = np.real(np_3d_array_frequencies[i][j][k])
+                amp_complex = np.imag(np_3d_array_frequencies[i][j][k])
+                val += single_freq_eval(sz, i, j, k, x, y, z, amp_real, amp_complex)
+                # print(val)
+    return val
+
+
+# Save as list of (3, s3) of [i=[],j=[],k=[]]
+def evaluate_with_matrix(np_3d_array_frequencies,xyz):
+    size = len(np_3d_array_frequencies)
+    s3 = size ** 3
+
+    i = np.linspace(0, size - 1, size)
+
+    A = np.array(np.meshgrid(i, i, i))
+    A = A.reshape(3, s3)  # Flatten into list of frequencies. (3x8000)
+
+    A_freq = np_3d_array_frequencies.reshape(1, s3)  # List of complex numbers. (1x8000)
+    # print(A.shape,A_freq.shape)
+
+    print(A.shape,xyz.shape)
+    M = np.matmul(A.T, xyz)
+    np.multiply((2 * np.pi / size), M,out=M)
+
+    return np.ndarray.flatten(-np.imag(A_freq) @ np.sin(M) + np.real(A_freq) @ np.cos(M))/s3
+
+
+"""
+M list comprehension
+
+
+"""
