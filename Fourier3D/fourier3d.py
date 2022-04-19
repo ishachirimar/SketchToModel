@@ -1,17 +1,22 @@
 import numpy as np
 from scipy.fft import ifftn, fftn
+
+import ProbMat
 from interpreter import parse
 
 
-def model(file_path, np_3d_array):
+def model(file_path, np_3d_array, post_mark=""):
     """Saves the model in [np_3d_array] to the destination [file_path]. Overwrites."""
     fileout = open(file_path, "w")
     for i in range(0, len(np_3d_array)):
         for j in range(0, len(np_3d_array[i])):
             for k in range(0, len(np_3d_array[i][j])):
-                fileout.write(str(np.real(np_3d_array[i][j][k])) + " ")
+                append_me = str(np.real(np_3d_array[i][j][k]))
+                if k != len(np_3d_array) - 1:
+                    append_me = append_me + ","
+                fileout.write(append_me)
             fileout.write("\n")
-        fileout.write("\n")
+    fileout.write(post_mark)
 
 
 def round_model(np_3d_array, frac_steps):
@@ -86,7 +91,7 @@ def reduction_spectrum(np_3d_array_complex, start, end, res, file_path):
 
 
 def generate_compressed(file_path, output_directory="data", output_prefix="model", freq_floor=0,
-                        model_fractional=27):
+                        model_fractional=27, post_mark=""):
     """Given .otto data at [file_path], writes a compressed version of the model, quashing amplitudes
     less than [freq_floor], to [output_directory] with the name "[output_prefix]_[flooring].txt".
     [model_fractional] determines the model's voxel quantization (voxel transparency).
@@ -94,7 +99,7 @@ def generate_compressed(file_path, output_directory="data", output_prefix="model
         <!> [decimal_rounding] be redundant with [model_fractional] -- merge.
     :returns string representing output file location
     """
-    sampledata = parse(file_path)
+    sampledata = ProbMat.readProbMat(file_path).Values
 
     series = fftn(sampledata)
     reduce(series, int(freq_floor))  # Destructively modifies series to keep high-amplitude components.
@@ -103,8 +108,8 @@ def generate_compressed(file_path, output_directory="data", output_prefix="model
     # Inverses Transform, elements < model_fractional --> 0.
     round_model(recovered_model, model_fractional)
 
-    model(str(output_directory) + "/" + str(output_prefix) + "_" + str(freq_floor) + ".txt", recovered_model)
-    return str(output_directory) + "/" + str(output_prefix) + "_" + str(freq_floor) + ".txt"
+    model(str(output_directory) + "/" + str(output_prefix) + "/" + str(freq_floor) + ".txt", recovered_model, post_mark)
+    return str(output_directory) + "/" + str(output_prefix) + "/" + str(freq_floor) + ".txt"
 
 
 def single_freq_eval(size, i, j, k, x, y, z, amp_real, amp_complex):
