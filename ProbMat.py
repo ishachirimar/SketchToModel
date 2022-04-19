@@ -51,7 +51,7 @@ def readProbMat(path):
     return probmat
 
 
-def dotplot(probmat, threshold):
+def dotplot(probmat, threshold, output=None):
     """Plot a dot representation of object in Camera Plane Space"""
     mat = probmat.Values
     grid = probmat.Grid
@@ -69,6 +69,8 @@ def dotplot(probmat, threshold):
     xx, yy, zz = np.meshgrid(series, series, series)
     size = mat * 10
     ax.scatter(xx, yy, zz, c=mat, s=size)
+    if output is not None:
+        plt.savefig(output)
     plt.show()
 
 def constructMesh(vertices, faces, path, name):
