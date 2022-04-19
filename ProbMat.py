@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 class Grid:
     """ definition of a grid of points """
@@ -89,9 +90,10 @@ def constructMesh(vertices, faces, path, name):
     file.write(txt)
     file.close()
     print("file made successfully here:\n" + path + name)
+    return path + name
 
 
-def meshprobmat(probmat, threshold, path, name):
+def meshprobmat(probmat, threshold, path, name, open):
     """convert the weighted voxel matrix into a mesh"""
 
     mat = probmat.Values
@@ -187,4 +189,7 @@ def meshprobmat(probmat, threshold, path, name):
     faces = np.row_stack((left_faces, right_faces, front_faces, back_faces, top_faces, bot_faces))
     print(vertices.shape)
     print(faces.shape)
-    constructMesh(vertices, faces, path, name)
+    where = constructMesh(vertices, faces, path, name)
+
+    if open:
+        os.startfile(where)
